@@ -12,6 +12,14 @@
     {
         private int retryCount;
 
+        static SeqWriter()
+        {
+            var builder = new UriBuilder(Configuration.SeqServer) { Path = "api/events/raw" };
+            Uri = builder.Uri;
+        }
+
+        public static Uri Uri { get; set; }
+
         public async Task WriteToSeq(JsonSyslogMessage message, int delay = 0)
         {
             if (message.Invalid)
@@ -36,7 +44,7 @@
             {
                 this.retryCount++;
                 Logger.Warning("Couldn't write to SEQ. Retry Count:[{0}] Exception: [{1}]", this.retryCount, capturedException.SourceException.Message);
-                await this.WriteToSeq(message, (int)Math.Pow(100, this.retryCount));
+                await this.WriteToSeq(message, (int)Math.Pow(2, this.retryCount));
             }
         }
 
@@ -44,9 +52,9 @@
         {
             using (var http = new HttpClient())
             {
-                using (var content = new StringContent("{\"events\":[" + message.ToString() + "]}", Encoding.UTF8, "application/json"))
+                using (var content = new StringContent("{\"events\":[" + message + "]}", Encoding.UTF8, "application/json"))
                 {
-                    var response = await http.PostAsync(new Uri(Configuration.SeqServer, "api/events/raw"), content).ConfigureAwait(false);
+                    var response = await http.PostAsync(Uri, content).ConfigureAwait(false);
                     response.EnsureSuccessStatusCode();
                 }
             }
